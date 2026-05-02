@@ -1,5 +1,6 @@
 local default_inline_lang = nil
 local needs_stylesheet = false
+local code_block_count = 0
 
 function Meta(meta)
 	if meta["inline-code-lang"] then
@@ -11,7 +12,7 @@ end
 function Code(el)
 	-- Only process if we are in a supported format
 	local is_html = quarto.doc.is_format("html")
-	local is_latex = quarto.doc.is_format("latex")
+	local is_latex = quarto.doc.is_format("latex") or quarto.doc.is_format("beamer")
 
 	if not (is_html or is_latex) then
 		return el
@@ -44,7 +45,7 @@ end
 function CodeBlock(el)
 	-- Only process if we are in a supported format
 	local is_html = quarto.doc.is_format("html")
-	local is_latex = quarto.doc.is_format("latex")
+	local is_latex = quarto.doc.is_format("latex") or quarto.doc.is_format("beamer")
 
 	if not (is_html or is_latex) then
 		return el
@@ -77,15 +78,24 @@ function CodeBlock(el)
 			return pandoc.RawBlock("html", html)
 		else
 			-- LaTeX code block
-			-- Pygments LaTeX output for code blocks usually includes a Verbatim environment
-			-- If 'nowrap=True' is used, we might need to wrap it ourselves or let pygmentize do it.
-			-- Let's re-run without nowrap for LaTeX blocks to get the Verbatim environment if needed,
-			-- OR wrap it manually. The user previously had 'nowrap=True' for HTML.
-			-- For LaTeX, pygmentize -f latex usually produces \begin{Verbatim}...
-			-- If we use nowrap=True, it doesn't.
 			local success_latex, res_latex = pcall(pandoc.pipe, "pygmentize", { "-l", lang, "-f", "latex" }, code)
 			if success_latex then
-				return pandoc.RawBlock("latex", res_latex)
+				if quarto.doc.is_format("beamer") then
+					-- Beamer needs fragile frames for Verbatim.
+					-- A workaround is to write the code to a file and \input it.
+					code_block_count = code_block_count + 1
+					local filename = "pygments-code-" .. code_block_count .. ".tex"
+					local f = io.open(filename, "w")
+					if f then
+						f:write(res_latex)
+						f:close()
+						return pandoc.RawBlock("latex", "\\input{" .. filename .. "}")
+					else
+						return el
+					end
+				else
+					return pandoc.RawBlock("latex", res_latex)
+				end
 			else
 				return el
 			end
@@ -118,7 +128,7 @@ function Pandoc(doc)
 				version = "1.0.0",
 				stylesheets = { "pygments.css" },
 			})
-		elseif quarto.doc.is_format("latex") then
+		elseif quarto.doc.is_format("latex") or quarto.doc.is_format("beamer") then
 			-- Include LaTeX macros for pygments
 			local success, res = pcall(pandoc.pipe, "pygmentize", { "-S", "default", "-f", "latex" }, "")
 			if success then
