@@ -18,6 +18,11 @@ The extension works as a Pandoc filter. It identifies `Code` and `CodeBlock` ele
 2. It passes the code and language to `pygmentize` to generate HTML.
 3. It replaces the original element with a `RawInline` or `RawBlock` containing the highlighted HTML.
 
+If any code is highlighted, the filter:
+1. Checks for the existence of `pygments.css` in the working directory.
+2. If missing, it generates it using `pygmentize -S default -f html -a .sourceCode`.
+3. Injects a `<link rel="stylesheet" href="pygments.css">` into the document's header.
+
 ## Requirements
 
 - **Quarto**: Version 1.9.0 or higher.
