@@ -23,12 +23,13 @@ For HTML output, the filter:
 4. If missing, it generates it using `pygmentize -S default -f html -a .sourceCode`.
 5. Injects the stylesheet as a Quarto HTML dependency.
 
-### LaTeX Support
-For LaTeX output, the filter:
+### LaTeX and Beamer Support
+For LaTeX and Beamer output, the filter:
 1. Calls `pygmentize` with `-f latex`.
 2. Replaces the element with a `RawInline` or `RawBlock` containing the highlighted LaTeX.
-3. Injects the required Pygments LaTeX macros into the header using `quarto.doc.include_text`.
-4. Adds dependencies for the `fancyvrb` and `color` LaTeX packages.
+3. For Beamer code blocks, it writes the LaTeX to a temporary `.tex` file and uses `\input{...}`. This avoids the requirement for `[fragile]` frames.
+4. Injects the required Pygments LaTeX macros into the header using `quarto.doc.include_text`.
+5. Adds dependencies for the `fancyvrb` and `color` LaTeX packages.
 
 ### Other Formats
 For other formats (e.g., Markdown, Typst, etc.), the filter leaves the code elements untouched, allowing Quarto's default highlighter or other filters to process them.
