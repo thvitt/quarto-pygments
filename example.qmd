@@ -4,8 +4,18 @@ filters:
   - pygments
 ---
 
-## Heading
+## Example
 
-This filter adds formatting to heading text.
+This document contains XQuery code, which is only supported in Pygments, not in Skylighting:
 
+```xquery
+for $sp in collection($data)//sp
+let $speaker = (@who, normalize-string(data(speaker)))
+return <tr>
+          <td>{@n}</td>
+          <td>{$speaker}</td>
+          <td>{count(.//l)}</td>
+       </tr>
+```
 
+Inline `elements(lg)`{.xquery} should work as well.
