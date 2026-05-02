@@ -13,15 +13,25 @@ This project is a Quarto extension that provides syntax highlighting using the [
 
 ## Architecture
 
-The extension works as a Pandoc filter. It identifies `Code` and `CodeBlock` elements that have a language class. For each element:
-1. It calls the `pygmentize` command-line tool.
-2. It passes the code and language to `pygmentize` to generate HTML.
-3. It replaces the original element with a `RawInline` or `RawBlock` containing the highlighted HTML.
+The extension works as a Pandoc filter. It identifies `Code` and `CodeBlock` elements that have a language class. It uses `quarto.doc.is_format()` to detect the output format and processes accordingly:
 
-If any code is highlighted, the filter:
-1. Checks for the existence of `pygments.css` in the working directory.
-2. If missing, it generates it using `pygmentize -S default -f html -a .sourceCode`.
-3. Injects a `<link rel="stylesheet" href="pygments.css">` into the document's header.
+### HTML Support
+For HTML output, the filter:
+1. Calls `pygmentize` with `-f html`.
+2. Replaces the element with a `RawInline` or `RawBlock` containing the highlighted HTML.
+3. Checks for the existence of `pygments.css` in the extension directory.
+4. If missing, it generates it using `pygmentize -S default -f html -a .sourceCode`.
+5. Injects the stylesheet as a Quarto HTML dependency.
+
+### LaTeX Support
+For LaTeX output, the filter:
+1. Calls `pygmentize` with `-f latex`.
+2. Replaces the element with a `RawInline` or `RawBlock` containing the highlighted LaTeX.
+3. Injects the required Pygments LaTeX macros into the header using `quarto.doc.include_text`.
+4. Adds dependencies for the `fancyvrb` and `color` LaTeX packages.
+
+### Other Formats
+For other formats (e.g., Markdown, Typst, etc.), the filter leaves the code elements untouched, allowing Quarto's default highlighter or other filters to process them.
 
 ## Requirements
 
