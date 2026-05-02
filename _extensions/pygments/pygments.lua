@@ -58,7 +58,10 @@ end
 
 function Pandoc(doc)
 	if needs_stylesheet then
-		local css_file = "pygments.css"
+		-- Use the directory where the filter is located
+		local extension_dir = quarto.utils.resolve_path(".")
+		local css_file = extension_dir .. "/pygments.css"
+
 		local f = io.open(css_file, "r")
 		if f then
 			f:close()
@@ -68,18 +71,12 @@ function Pandoc(doc)
 			os.execute("pygmentize -S default -f html -a .sourceCode > " .. css_file)
 		end
 
-		-- Inject the stylesheet link into header-includes
-		local link = '<link rel="stylesheet" href="' .. css_file .. '">'
-		local raw_link = pandoc.RawBlock("html", link)
-
-		if doc.meta["header-includes"] == nil then
-			doc.meta["header-includes"] = pandoc.MetaList({ raw_link })
-		else
-			if type(doc.meta["header-includes"]) ~= "table" then
-				doc.meta["header-includes"] = pandoc.MetaList({ doc.meta["header-includes"] })
-			end
-			table.insert(doc.meta["header-includes"], raw_link)
-		end
+		-- Use Quarto API to add the stylesheet as a dependency
+		quarto.doc.add_html_dependency({
+			name = "pygments",
+			version = "1.0.0",
+			stylesheets = { "pygments.css" },
+		})
 	end
 	return doc
 end
