@@ -1,0 +1,11 @@
+---
+title: "Pygments Example"
+filters:
+  - pygments
+---
+
+## Heading
+
+This filter adds formatting to heading text.
+
+
