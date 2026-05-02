@@ -1,4 +1,5 @@
 local default_inline_lang = nil
+local default_block_lang = nil
 local needs_stylesheet = false
 local code_block_count = 0
 
@@ -6,102 +7,81 @@ function Meta(meta)
 	if meta["inline-code-lang"] then
 		default_inline_lang = pandoc.utils.stringify(meta["inline-code-lang"])
 	end
+	if meta["block-code-lang"] then
+		default_block_lang = pandoc.utils.stringify(meta["block-code-lang"])
+	end
 	return meta
 end
 
-function Code(el)
-	-- Only process if we are in a supported format
+local function render_code(el, default_lang)
 	local is_html = quarto.doc.is_format("html")
-	local is_latex = quarto.doc.is_format("latex") or quarto.doc.is_format("beamer")
-
-	if not (is_html or is_latex) then
-		return el
+	local is_latex = quarto.doc.is_format("latex")
+	local lang = el.classes[1] or default_lang
+	if not (is_html or is_latex) or lang == nil or lang == "" or lang == "text" then
+		return el, nil
 	end
-
-	local lang = el.classes[1] or default_inline_lang
-	if lang == nil or lang == "" or lang == "text" then
-		return el
-	end
-
 	local format = is_html and "html" or "latex"
-	local options = { "-l", lang, "-f", format, "-O", "nowrap=True" }
-	local success, res = pcall(pandoc.pipe, "pygmentize", options, el.text)
 
+	local options
+	if format == "html" or pandoc.utils.type(el) == "Inline" then
+		options = { "-l", lang, "-f", format, "-O", "nowrap=True" }
+	else
+		options = { "-l", lang, "-f", format }
+	end
+
+	local success, res = pcall(pandoc.pipe, "pygmentize", options, el.text)
+	quarto.log.output(res)
 	if success then
 		needs_stylesheet = true
-		if is_html then
-			-- Remove trailing newline/whitespace
-			res = res:gsub("%s+$", "")
-			return pandoc.RawInline("html", '<code class="sourceCode ' .. lang .. '">' .. res .. "</code>")
-		else
-			-- LaTeX inline code
-			return pandoc.RawInline("latex", res)
-		end
+		return res, format
+	else
+		return nil, nil
+	end
+end
+function Code(el)
+	local res, lang = render_code(el, default_inline_lang)
+	if lang == "html" then
+		-- Remove trailing newline/whitespace
+		res = res:gsub("%s+$", "")
+		return pandoc.RawInline("html", '<code class="sourceCode ' .. lang .. '">' .. res .. "</code>")
+	elseif lang == "latex" then
+		return pandoc.RawInline("latex", res)
 	else
 		return el
 	end
 end
 
 function CodeBlock(el)
-	-- Only process if we are in a supported format
-	local is_html = quarto.doc.is_format("html")
-	local is_latex = quarto.doc.is_format("latex") or quarto.doc.is_format("beamer")
-
-	if not (is_html or is_latex) then
-		return el
-	end
-
-	-- Only process if a language is specified
-	if el.classes[1] == nil then
-		return el
-	end
-
-	-- Define the language and the code
-	local lang = el.classes[1]
-	local code = el.text
-
-	local format = is_html and "html" or "latex"
-	local options = { "-l", lang, "-f", format, "-O", "nowrap=True" }
-	local success, res = pcall(pandoc.pipe, "pygmentize", options, code)
-
-	if success then
-		needs_stylesheet = true
-		if is_html then
-			-- Wrap in standard Reveal.js/Quarto classes so the layout doesn't break
-			local html = '<div class="sourceCode"><pre class="sourceCode '
-				.. lang
-				.. '"><code class="sourceCode '
-				.. lang
-				.. '">'
-				.. res
-				.. "</code></pre></div>"
-			return pandoc.RawBlock("html", html)
-		else
-			-- LaTeX code block
-			local success_latex, res_latex = pcall(pandoc.pipe, "pygmentize", { "-l", lang, "-f", "latex" }, code)
-			if success_latex then
-				if quarto.doc.is_format("beamer") then
-					-- Beamer needs fragile frames for Verbatim.
-					-- A workaround is to write the code to a file and \input it.
-					code_block_count = code_block_count + 1
-					local filename = "pygments-code-" .. code_block_count .. ".tex"
-					local f = io.open(filename, "w")
-					if f then
-						f:write(res_latex)
-						f:close()
-						return pandoc.RawBlock("latex", "\\input{" .. filename .. "}")
-					else
-						return el
-					end
-				else
-					return pandoc.RawBlock("latex", res_latex)
-				end
+	local res, format = render_code(el, default_block_lang)
+	if format == "html" then
+		-- Wrap in standard Reveal.js/Quarto classes so the layout doesn't break
+		local html = '<div class="sourceCode"><pre class="sourceCode '
+			.. format
+			.. '"><code class="sourceCode '
+			.. format
+			.. '">'
+			.. res
+			.. "</code></pre></div>"
+		return pandoc.RawBlock("html", html)
+	elseif format == "latex" then
+		-- LaTeX code block
+		if quarto.doc.is_format("beamer") then
+			-- Beamer needs fragile frames for Verbatim.
+			-- A workaround is to write the code to a file and \input it.
+			code_block_count = code_block_count + 1
+			local filename = ".pygments-code-" .. code_block_count .. ".tex"
+			local f = io.open(filename, "w")
+			if f then
+				f:write(res_latex)
+				f:close()
+				return pandoc.RawBlock("latex", "\\input{" .. filename .. "}")
 			else
 				return el
 			end
+		else
+			return pandoc.RawBlock("latex", res)
 		end
 	else
-		-- Fallback to default if pygmentize fails
 		return el
 	end
 end

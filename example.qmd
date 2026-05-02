@@ -2,6 +2,10 @@
 title: "Pygments Example"
 filters:
   - pygments
+format:
+  html: default
+  pdf: default
+  revealjs: default
 ---
 
 ## Example
