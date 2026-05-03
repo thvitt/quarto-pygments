@@ -1,8 +1,14 @@
+---@type string|nil
 local default_inline_lang = nil
+---@type string|nil
 local default_block_lang = nil
+---@type boolean
 local needs_stylesheet = false
+---@type number
 local code_block_count = 0
 
+---@param meta pandoc.Meta
+---@return pandoc.Meta
 function Meta(meta)
 	if meta["inline-code-lang"] then
 		default_inline_lang = pandoc.utils.stringify(meta["inline-code-lang"])
@@ -13,12 +19,15 @@ function Meta(meta)
 	return meta
 end
 
+---@param el pandoc.Code|pandoc.CodeBlock
+---@param default_lang string?
+---@return [string, string]?
 local function render_code(el, default_lang)
 	local is_html = quarto.doc.is_format("html")
 	local is_latex = quarto.doc.is_format("latex")
 	local lang = el.classes[1] or default_lang
 	if not (is_html or is_latex) or lang == nil or lang == "" or lang == "text" then
-		return el, nil
+		return nil
 	end
 	local format = is_html and "html" or "latex"
 
@@ -30,17 +39,20 @@ local function render_code(el, default_lang)
 	end
 
 	local success, res = pcall(pandoc.pipe, "pygmentize", options, el.text)
-	quarto.log.output(res)
 	if success then
 		needs_stylesheet = true
+		---@diagnostic disable-next-line: return-type-mismatch
 		return res, format
 	else
-		return nil, nil
+		return nil
 	end
 end
+
+---@param el pandoc.Code
+---@return pandoc.Code|pandoc.RawInline
 function Code(el)
 	local res, lang = render_code(el, default_inline_lang)
-	if lang == "html" then
+	if lang == "html" and res ~= nil then
 		-- Remove trailing newline/whitespace
 		res = res:gsub("%s+$", "")
 		return pandoc.RawInline("html", '<code class="sourceCode ' .. lang .. '">' .. res .. "</code>")
@@ -51,6 +63,8 @@ function Code(el)
 	end
 end
 
+---@param el pandoc.CodeBlock
+---@return pandoc.CodeBlock|pandoc.RawBlock
 function CodeBlock(el)
 	local res, format = render_code(el, default_block_lang)
 	if format == "html" then
@@ -72,7 +86,7 @@ function CodeBlock(el)
 			local filename = ".pygments-code-" .. code_block_count .. ".tex"
 			local f = io.open(filename, "w")
 			if f then
-				f:write(res_latex)
+				f:write(res)
 				f:close()
 				return pandoc.RawBlock("latex", "\\input{" .. filename .. "}")
 			else
@@ -86,6 +100,8 @@ function CodeBlock(el)
 	end
 end
 
+---@param doc pandoc.Pandoc
+---@return pandoc.Pandoc
 function Pandoc(doc)
 	if needs_stylesheet then
 		if quarto.doc.is_format("html") then
