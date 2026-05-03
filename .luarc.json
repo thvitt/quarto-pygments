@@ -1,0 +1,21 @@
+{
+    "$schema": "https://raw.githubusercontent.com/sumneko/vscode-lua/master/setting/schema.json",
+    "runtime": {
+        "version": "Lua 5.3"
+    },
+    "workspace": {
+        "library": [
+            "/opt/quarto/share/lua-types"
+        ],
+        "checkThirdParty": false
+    },
+    "diagnostics": {
+        "globals": [
+            "quarto",
+            "pandoc"
+        ]
+    },
+    "diagnostics.disable": [
+        "redundant-return-value"
+    ]
+}
